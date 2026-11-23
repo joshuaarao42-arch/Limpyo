@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "limpyo"
+version = "0.1.0"
+description = "Limpyo (Cebuano for 'clean'): sort a messy folder by file type, with dry-run and undo."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Joshua C. Arao" }]
+keywords = ["file-organizer", "cli", "cebuano", "downloads"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Environment :: Console",
+]
+
+[project.scripts]
+limpyo = "limpyo.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
