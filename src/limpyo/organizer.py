@@ -52,7 +52,6 @@ def plan(folder: Path) -> list[Move]:
             continue
         target_dir = folder / category_for(item)
         target = unique_path(target_dir / item.name)
-        # Avoid two files in this same plan landing on the same name.
         while target in taken:
             target = target.with_name(f"{target.stem} (x){target.suffix}")
             target = unique_path(target)
@@ -62,14 +61,30 @@ def plan(folder: Path) -> list[Move]:
 
 
 def apply(folder: Path, moves: list[Move]) -> int:
-    """Perform the moves and record them so they can be undone. Returns count moved."""
+    """Perform moves transactionally and record them for undo.
+
+    If a move fails, already-moved files are restored before the error is re-raised.
+    """
     folder = Path(folder)
     done: list[Move] = []
-    for move in moves:
-        src, dst = folder / move.src, folder / move.dst
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(src), str(dst))
-        done.append(move)
+    try:
+        for move in moves:
+            src, dst = folder / move.src, folder / move.dst
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(src), str(dst))
+            done.append(move)
+    except Exception:
+        # Do not leave a half-organized folder without a matching undo record.
+        for move in reversed(done):
+            src, dst = folder / move.src, folder / move.dst
+            if dst.exists():
+                src.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(dst), str(src))
+            try:
+                dst.parent.rmdir()
+            except OSError:
+                pass
+        raise
     if done:
         _append_history(folder, done)
     return len(done)
@@ -92,7 +107,6 @@ def undo(folder: Path) -> tuple[int, list[str]]:
         target = unique_path(src)
         shutil.move(str(dst), str(target))
         restored += 1
-        # Remove the category folder if we emptied it.
         try:
             dst.parent.rmdir()
         except OSError:
