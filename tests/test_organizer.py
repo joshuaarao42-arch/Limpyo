@@ -76,6 +76,30 @@ class OrganizerTests(unittest.TestCase):
         with self.assertRaises(NotADirectoryError):
             organizer.plan(self.folder / "nope")
 
+    def test_apply_rolls_back_when_a_move_fails(self):
+        from unittest.mock import patch
+
+        make(self.folder, "a.png", "b.pdf")
+        moves = organizer.plan(self.folder)
+        real_move = organizer.shutil.move
+        calls = 0
+
+        def fail_on_second_move(src, dst):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise OSError("simulated disk error")
+            return real_move(src, dst)
+
+        with patch.object(organizer.shutil, "move", side_effect=fail_on_second_move):
+            with self.assertRaisesRegex(OSError, "simulated disk error"):
+                organizer.apply(self.folder, moves)
+
+        self.assertTrue((self.folder / "a.png").exists())
+        self.assertTrue((self.folder / "b.pdf").exists())
+        self.assertFalse((self.folder / organizer.HISTORY_FILE).exists())
+        self.assertFalse((self.folder / "Images").exists())
+
 
 class CliTests(unittest.TestCase):
     def test_dry_run_changes_nothing(self):
